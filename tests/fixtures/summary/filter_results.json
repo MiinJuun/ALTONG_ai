@@ -1,0 +1,51 @@
+[
+  {
+    "notification_id": "noti_20260913_001",
+    "is_passed": false,
+    "urgency_score": 5,
+    "relevance_score": 4,
+    "category": "긴급 업무",
+    "ai_summary_reason": "가상 서버 오류 알림"
+  },
+  {
+    "notification_id": "noti_20260913_002",
+    "is_passed": false,
+    "urgency_score": 4,
+    "relevance_score": 4,
+    "category": "업무",
+    "ai_summary_reason": "가상 서버 후속 알림"
+  },
+  {
+    "notification_id": "noti_20260913_003",
+    "is_passed": false,
+    "urgency_score": 3,
+    "relevance_score": 5,
+    "category": "학업",
+    "ai_summary_reason": "가상 과제 기한 알림"
+  },
+  {
+    "notification_id": "noti_20260913_004",
+    "is_passed": true,
+    "urgency_score": 1,
+    "relevance_score": 1,
+    "category": "잡담",
+    "ai_summary_reason": "가상 일상 대화"
+  },
+  {
+    "notification_id": "noti_20260913_005",
+    "is_passed": false,
+    "urgency_score": 4,
+    "relevance_score": 5,
+    "category": "일정",
+    "ai_summary_reason": "가상 시험 일정 변경"
+  },
+  {
+    "notification_id": "noti_20260913_006",
+    "is_passed": false,
+    "urgency_score": 5,
+    "relevance_score": 4,
+    "category": "긴급 업무",
+    "ai_summary_reason": "중복된 가상 서버 오류 알림"
+  }
+]
+
