@@ -17,7 +17,12 @@ from .models import (
     ScoreAggregate,
     SessionBriefing,
 )
-from .providers import BriefingProvider, RuleBasedBriefingProvider
+from .providers import (
+    BriefingProvider,
+    CategoryProvider,
+    RuleBasedBriefingProvider,
+    RuleBasedCategoryProvider,
+)
 
 
 def _aggregate(values: list[int]) -> ScoreAggregate:
@@ -47,8 +52,13 @@ def _group_id(group: RuleGroup) -> str:
 class SessionBriefingService:
     """Build structured JSON from blocked synthetic notifications."""
 
-    def __init__(self, provider: BriefingProvider | None = None) -> None:
+    def __init__(
+        self,
+        provider: BriefingProvider | None = None,
+        category_provider: CategoryProvider | None = None,
+    ) -> None:
         self._provider = provider or RuleBasedBriefingProvider()
+        self._category_provider = category_provider or RuleBasedCategoryProvider()
 
     def build(
         self,
@@ -116,15 +126,17 @@ class SessionBriefingService:
         first = group.items[0].notification
         urgency_values = [item.filter_result.urgency_score for item in group.items]
         relevance_values = [item.filter_result.relevance_score for item in group.items]
+        category = self._category_provider.categorize(group.items)
         return BriefingGroup(
             group_id=_group_id(group),
             app_name=first.app_name,
             sender=first.sender,
             time_bucket_start=group.bucket,
+            primary_category=category.primary_category,
+            category_evidence_notification_ids=category.evidence_notification_ids,
             notification_ids=tuple(item.notification.id for item in group.items),
             keywords=representative_keywords(group),
             urgency=_aggregate(urgency_values),
             relevance=_aggregate(relevance_values),
             summary_lines=self._provider.summarize(group.items),
         )
-

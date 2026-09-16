@@ -42,13 +42,14 @@ def filter_result(
     is_passed: bool = False,
     urgency: int = 3,
     relevance: int = 3,
+    category: str = "가상 테스트",
 ) -> dict[str, object]:
     return {
         "notification_id": notification_id,
         "is_passed": is_passed,
         "urgency_score": urgency,
         "relevance_score": relevance,
-        "category": "가상 테스트",
+        "category": category,
         "ai_summary_reason": "가상 테스트 판단",
     }
 
@@ -144,6 +145,85 @@ class SessionBriefingServiceTests(unittest.TestCase):
         self.assertIn({"n5"}, grouped_ids)
         self.assertEqual(briefing["group_count"], 4)
 
+    def test_category_is_decided_after_grouping_and_latest_breaks_tie(self) -> None:
+        notifications = [
+            notification(
+                "n1",
+                title="프로젝트 회의 공지",
+                body="프로젝트 회의 관련 내용을 공유합니다.",
+            ),
+            notification(
+                "n2",
+                title="프로젝트 회의 일정 변경",
+                body="프로젝트 회의 일정은 내일 15시로 변경됩니다.",
+                timestamp="2026-09-13T18:30:00Z",
+            ),
+        ]
+        results = [
+            filter_result("n1", category="업무", urgency=5, relevance=5),
+            filter_result("n2", category="일정", urgency=1, relevance=1),
+        ]
+
+        group = self.service.build(
+            session_id="session_category",
+            notifications=notifications,
+            filter_results=results,
+            generated_at=self.generated_at,
+        ).to_dict()["groups"][0]
+
+        self.assertEqual(group["primary_category"], "일정")
+        self.assertEqual(group["category_evidence_notification_ids"], ["n2"])
+
+    def test_rule_based_summary_is_extractive_and_limited_to_three_lines(self) -> None:
+        notifications = [
+            notification(
+                f"n{index}",
+                title=f"공통 서버 상태 {index}",
+                body=f"공통 서버 상태 알림 원문 {index}입니다.",
+                timestamp=f"2026-09-13T18:{index:02d}:00Z",
+            )
+            for index in range(1, 5)
+        ]
+        results = [
+            filter_result(f"n{index}", category="긴급 업무", urgency=index)
+            for index in range(1, 5)
+        ]
+
+        group = self.service.build(
+            session_id="session_extractive_summary",
+            notifications=notifications,
+            filter_results=results,
+            generated_at=self.generated_at,
+        ).to_dict()["groups"][0]
+
+        self.assertLessEqual(len(group["summary_lines"]), 3)
+        source_lines = {
+            f"{item['title']} — {item['body']}" for item in notifications
+        }
+        self.assertTrue(set(group["summary_lines"]).issubset(source_lines))
+        self.assertIn(
+            "공통 서버 상태 4 — 공통 서버 상태 알림 원문 4입니다.",
+            group["summary_lines"],
+        )
+
+    def test_blocked_chat_group_is_categorized_as_chat(self) -> None:
+        group = self.service.build(
+            session_id="session_chat",
+            notifications=[
+                notification(
+                    "n1",
+                    app="KakaoTalk",
+                    sender="가상 친구",
+                    title="저녁 메뉴",
+                    body="저녁 메뉴를 같이 정해 보자.",
+                )
+            ],
+            filter_results=[filter_result("n1", category="잡담")],
+            generated_at=self.generated_at,
+        ).to_dict()["groups"][0]
+
+        self.assertEqual(group["primary_category"], "잡담")
+
     def test_fixture_filters_passed_items_and_aggregates_scores(self) -> None:
         briefing = self.service.build(
             session_id="session_fixture",
@@ -170,6 +250,7 @@ class SessionBriefingServiceTests(unittest.TestCase):
         )
         self.assertEqual(server_group["urgency_score"], {"min": 4, "max": 5, "average": 4.5})
         self.assertEqual(server_group["relevance_score"], {"min": 4, "max": 4, "average": 4.0})
+        self.assertEqual(server_group["primary_category"], "업무")
         self.assertLessEqual(len(server_group["summary_lines"]), 3)
 
     def test_legacy_timezone_less_timestamp_is_accepted_and_output_as_utc(self) -> None:

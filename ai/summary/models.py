@@ -117,6 +117,12 @@ class BriefingItem:
 
 
 @dataclass(frozen=True, slots=True)
+class CategoryDecision:
+    primary_category: str
+    evidence_notification_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ScoreAggregate:
     minimum: int
     maximum: int
@@ -136,6 +142,8 @@ class BriefingGroup:
     app_name: str
     sender: str
     time_bucket_start: datetime
+    primary_category: str
+    category_evidence_notification_ids: tuple[str, ...]
     notification_ids: tuple[str, ...]
     keywords: tuple[str, ...]
     urgency: ScoreAggregate
@@ -148,6 +156,10 @@ class BriefingGroup:
             "app_name": self.app_name,
             "sender": self.sender,
             "time_bucket_start": format_timestamp(self.time_bucket_start),
+            "primary_category": self.primary_category,
+            "category_evidence_notification_ids": list(
+                self.category_evidence_notification_ids
+            ),
             "notification_ids": list(self.notification_ids),
             "notification_count": len(self.notification_ids),
             "keywords": list(self.keywords),
@@ -176,4 +188,3 @@ class SessionBriefing:
             "group_count": len(self.groups),
             "groups": [group.to_dict() for group in self.groups],
         }
-
