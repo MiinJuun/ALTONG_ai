@@ -1,4 +1,8 @@
-"""Deterministic baseline grouping for blocked notifications."""
+"""Deterministic baseline grouping for blocked notifications.
+
+This module is the rule-based comparison baseline.  Local embeddings and
+unsupervised clustering can be added later without changing the pipeline API.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +12,7 @@ from datetime import datetime
 import re
 import unicodedata
 
-from .models import BriefingItem
+from .schema import BriefingItem
 
 
 _TOKEN_PATTERN = re.compile(r"[0-9A-Za-z가-힣_]+")

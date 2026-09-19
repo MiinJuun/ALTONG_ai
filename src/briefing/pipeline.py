@@ -7,8 +7,8 @@ import hashlib
 import json
 from typing import Any, Iterable, Mapping
 
-from .grouping import RuleGroup, group_items, representative_keywords
-from .models import (
+from .clustering import RuleGroup, group_items, representative_keywords
+from .schema import (
     BriefingGroup,
     BriefingItem,
     ContractValidationError,
@@ -17,7 +17,7 @@ from .models import (
     ScoreAggregate,
     SessionBriefing,
 )
-from .providers import (
+from .summarize import (
     BriefingProvider,
     CategoryProvider,
     RuleBasedBriefingProvider,

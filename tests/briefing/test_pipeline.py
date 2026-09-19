@@ -5,11 +5,13 @@ import json
 from pathlib import Path
 import unittest
 
-from ai.summary.models import ContractValidationError
-from ai.summary.service import SessionBriefingService
+from src.briefing.pipeline import SessionBriefingService
+from src.briefing.schema import ContractValidationError
 
 
-FIXTURE_DIR = Path(__file__).resolve().parent / "fixtures" / "summary"
+FIXTURE_DIR = (
+    Path(__file__).resolve().parents[2] / "data" / "sample" / "briefing"
+)
 
 
 def load_fixture(name: str) -> list[dict[str, object]]:
@@ -54,7 +56,7 @@ def filter_result(
     }
 
 
-class SessionBriefingServiceTests(unittest.TestCase):
+class BriefingPipelineTests(unittest.TestCase):
     def setUp(self) -> None:
         self.service = SessionBriefingService()
         self.generated_at = datetime(2026, 9, 13, 20, 0, tzinfo=timezone.utc)

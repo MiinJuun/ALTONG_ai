@@ -1,4 +1,4 @@
-"""Temporary, summary-local data contracts for the first MVP.
+"""Temporary, briefing-local data contracts for the first MVP.
 
 These classes mirror the fields currently described for ``RawNotification`` and
 ``FilterResult`` without changing or claiming ownership of the shared contract.

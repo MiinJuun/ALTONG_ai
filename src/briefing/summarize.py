@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Protocol, Sequence
 
 from .categorization import categorize_group
-from .models import BriefingItem, CategoryDecision, RawNotification
+from .schema import BriefingItem, CategoryDecision, RawNotification
 
 
 class NotificationSanitizer(Protocol):

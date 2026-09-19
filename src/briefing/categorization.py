@@ -6,7 +6,7 @@ from collections import defaultdict
 import re
 import unicodedata
 
-from .models import BriefingItem, CategoryDecision
+from .schema import BriefingItem, CategoryDecision
 
 
 WORK = "업무"
