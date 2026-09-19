@@ -1,0 +1,190 @@
+"""Temporary, briefing-local data contracts for the first MVP.
+
+These classes mirror the fields currently described for ``RawNotification`` and
+``FilterResult`` without changing or claiming ownership of the shared contract.
+They can later be replaced by adapters around the models owned by ``common``.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any, Mapping
+
+
+class ContractValidationError(ValueError):
+    """Raised when input data cannot satisfy the temporary MVP contract."""
+
+
+def parse_timestamp(value: str) -> datetime:
+    """Parse an ISO 8601 timestamp and normalize it to UTC.
+
+    The README examples omit a timezone.  For backward-compatible MVP parsing,
+    such values are temporarily interpreted as UTC.  New fixtures and generated
+    output use an explicit ``Z`` suffix.
+    """
+
+    if not isinstance(value, str) or not value.strip():
+        raise ContractValidationError("timestamp must be a non-empty ISO 8601 string")
+
+    normalized = value.strip()
+    if normalized.endswith(("Z", "z")):
+        normalized = f"{normalized[:-1]}+00:00"
+
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ContractValidationError(f"invalid ISO 8601 timestamp: {value!r}") from exc
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def format_timestamp(value: datetime) -> str:
+    """Serialize a datetime as a UTC ISO 8601 string with a ``Z`` suffix."""
+
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _required_string(data: Mapping[str, Any], field: str) -> str:
+    value = data.get(field)
+    if not isinstance(value, str) or not value.strip():
+        raise ContractValidationError(f"{field} must be a non-empty string")
+    return value.strip()
+
+
+def _score(data: Mapping[str, Any], field: str) -> int:
+    value = data.get(field)
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ContractValidationError(f"{field} must be an integer from 1 to 5")
+    if not 1 <= value <= 5:
+        raise ContractValidationError(f"{field} must be between 1 and 5")
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class RawNotification:
+    id: str
+    app_name: str
+    sender: str
+    title: str
+    body: str
+    timestamp: datetime
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "RawNotification":
+        return cls(
+            id=_required_string(data, "id"),
+            app_name=_required_string(data, "app_name"),
+            sender=_required_string(data, "sender"),
+            title=_required_string(data, "title"),
+            body=_required_string(data, "body"),
+            timestamp=parse_timestamp(_required_string(data, "timestamp")),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class FilterResult:
+    notification_id: str
+    is_passed: bool
+    urgency_score: int
+    relevance_score: int
+    category: str
+    ai_summary_reason: str
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "FilterResult":
+        is_passed = data.get("is_passed")
+        if not isinstance(is_passed, bool):
+            raise ContractValidationError("is_passed must be a boolean")
+        return cls(
+            notification_id=_required_string(data, "notification_id"),
+            is_passed=is_passed,
+            urgency_score=_score(data, "urgency_score"),
+            relevance_score=_score(data, "relevance_score"),
+            category=_required_string(data, "category"),
+            ai_summary_reason=_required_string(data, "ai_summary_reason"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class BriefingItem:
+    notification: RawNotification
+    filter_result: FilterResult
+
+
+@dataclass(frozen=True, slots=True)
+class CategoryDecision:
+    primary_category: str
+    evidence_notification_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ScoreAggregate:
+    minimum: int
+    maximum: int
+    average: float
+
+    def to_dict(self) -> dict[str, int | float]:
+        return {
+            "min": self.minimum,
+            "max": self.maximum,
+            "average": self.average,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class BriefingGroup:
+    group_id: str
+    app_name: str
+    sender: str
+    time_bucket_start: datetime
+    primary_category: str
+    category_evidence_notification_ids: tuple[str, ...]
+    notification_ids: tuple[str, ...]
+    keywords: tuple[str, ...]
+    urgency: ScoreAggregate
+    relevance: ScoreAggregate
+    summary_lines: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "group_id": self.group_id,
+            "app_name": self.app_name,
+            "sender": self.sender,
+            "time_bucket_start": format_timestamp(self.time_bucket_start),
+            "primary_category": self.primary_category,
+            "category_evidence_notification_ids": list(
+                self.category_evidence_notification_ids
+            ),
+            "notification_ids": list(self.notification_ids),
+            "notification_count": len(self.notification_ids),
+            "keywords": list(self.keywords),
+            "urgency_score": self.urgency.to_dict(),
+            "relevance_score": self.relevance.to_dict(),
+            "summary_lines": list(self.summary_lines),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SessionBriefing:
+    session_id: str
+    generated_at: datetime
+    source_notification_count: int
+    blocked_notification_count: int
+    duplicate_count: int
+    groups: tuple[BriefingGroup, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "session_id": self.session_id,
+            "generated_at": format_timestamp(self.generated_at),
+            "source_notification_count": self.source_notification_count,
+            "blocked_notification_count": self.blocked_notification_count,
+            "duplicate_count": self.duplicate_count,
+            "group_count": len(self.groups),
+            "groups": [group.to_dict() for group in self.groups],
+        }
