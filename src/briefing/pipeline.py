@@ -7,6 +7,12 @@ import hashlib
 import json
 from typing import Any, Iterable, Mapping
 
+from .action_items import (
+    ActionItemProvider,
+    CandidateExtraction,
+    RuleBasedActionItemProvider,
+    merge_candidates,
+)
 from .clustering import RuleGroup, group_items, representative_keywords
 from .schema import (
     BriefingGroup,
@@ -56,9 +62,11 @@ class SessionBriefingService:
         self,
         provider: BriefingProvider | None = None,
         category_provider: CategoryProvider | None = None,
+        action_item_provider: ActionItemProvider | None = None,
     ) -> None:
         self._provider = provider or RuleBasedBriefingProvider()
         self._category_provider = category_provider or RuleBasedCategoryProvider()
+        self._action_item_provider = action_item_provider or RuleBasedActionItemProvider()
 
     def build(
         self,
@@ -96,7 +104,19 @@ class SessionBriefingService:
             seen_fingerprints.add(fingerprint)
             blocked.append(BriefingItem(notification=notification, filter_result=result))
 
-        groups = tuple(self._build_group(group) for group in group_items(blocked))
+        rule_groups = group_items(blocked)
+        groups: list[BriefingGroup] = []
+        extractions: list[CandidateExtraction] = []
+        for rule_group in rule_groups:
+            briefing_group = self._build_group(rule_group)
+            groups.append(briefing_group)
+            extractions.append(
+                self._action_item_provider.extract(
+                    group_id=briefing_group.group_id,
+                    items=rule_group.items,
+                )
+            )
+        candidates = merge_candidates(extractions)
         timestamp = generated_at or datetime.now(timezone.utc)
         return SessionBriefing(
             session_id=session_id.strip(),
@@ -104,7 +124,9 @@ class SessionBriefingService:
             source_notification_count=len(parsed_notifications),
             blocked_notification_count=len(blocked),
             duplicate_count=duplicate_count,
-            groups=groups,
+            groups=tuple(groups),
+            todo_candidates=candidates.todos,
+            calendar_candidates=candidates.calendar,
         )
 
     def build_json(self, **kwargs: Any) -> str:
