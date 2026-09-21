@@ -170,6 +170,54 @@ class BriefingGroup:
 
 
 @dataclass(frozen=True, slots=True)
+class TodoCandidate:
+    """Temporary briefing-local candidate for a user action."""
+
+    candidate_id: str
+    text: str
+    due_at: datetime | None
+    is_all_day: bool
+    source_notification_ids: tuple[str, ...]
+    source_group_ids: tuple[str, ...]
+    matched_cues: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "candidate_id": self.candidate_id,
+            "text": self.text,
+            "due_at": format_timestamp(self.due_at) if self.due_at else None,
+            "is_all_day": self.is_all_day,
+            "source_notification_ids": list(self.source_notification_ids),
+            "source_group_ids": list(self.source_group_ids),
+            "matched_cues": list(self.matched_cues),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class CalendarCandidate:
+    """Temporary briefing-local candidate for a calendar event."""
+
+    candidate_id: str
+    title: str
+    scheduled_at: datetime
+    is_all_day: bool
+    source_notification_ids: tuple[str, ...]
+    source_group_ids: tuple[str, ...]
+    matched_cues: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "candidate_id": self.candidate_id,
+            "title": self.title,
+            "scheduled_at": format_timestamp(self.scheduled_at),
+            "is_all_day": self.is_all_day,
+            "source_notification_ids": list(self.source_notification_ids),
+            "source_group_ids": list(self.source_group_ids),
+            "matched_cues": list(self.matched_cues),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class SessionBriefing:
     session_id: str
     generated_at: datetime
@@ -177,6 +225,8 @@ class SessionBriefing:
     blocked_notification_count: int
     duplicate_count: int
     groups: tuple[BriefingGroup, ...]
+    todo_candidates: tuple[TodoCandidate, ...] = ()
+    calendar_candidates: tuple[CalendarCandidate, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -187,4 +237,10 @@ class SessionBriefing:
             "duplicate_count": self.duplicate_count,
             "group_count": len(self.groups),
             "groups": [group.to_dict() for group in self.groups],
+            "todo_candidate_count": len(self.todo_candidates),
+            "todo_candidates": [candidate.to_dict() for candidate in self.todo_candidates],
+            "calendar_candidate_count": len(self.calendar_candidates),
+            "calendar_candidates": [
+                candidate.to_dict() for candidate in self.calendar_candidates
+            ],
         }
