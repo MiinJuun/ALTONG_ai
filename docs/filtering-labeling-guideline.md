@@ -41,7 +41,7 @@ ALTONG 필터링 AI는 현재 작업 맥락(`CurrentContext`)과 수신 알림(`
   "sender": "김철수 팀장",
   "title": "[긴급] 서버 배포 오류",
   "body": "지금 서버 에러가 발생해 긴급 핫픽스 부탁드립니다.",
-  "timestamp": "2026-09-13T18:05:00"
+  "timestamp": "2026-09-13T18:05:00Z"
 }
 
 ### CurrentContext
@@ -55,10 +55,13 @@ ALTONG 필터링 AI는 현재 작업 맥락(`CurrentContext`)과 수신 알림(`
 {
   "active_process": "Code.exe",
   "window_title": "auth_controller.py - ALTONG - Visual Studio Code",
-  "last_updated": "2026-09-13T18:04:55"
+  "last_updated": "2026-09-13T18:04:55Z"
 }
 
 모델은 위 정보만을 이용하여 판단한다.
+
+`timestamp`와 `last_updated`는 UTC 기준 ISO 8601 형식을 사용하며,
+문자열 끝에 `Z`를 붙인다.
 
 입력에 존재하지 않는 사용자 개인 일정, 실제 인간관계의 중요도,
 이전 대화 내용 등의 정보는 추측하지 않는 것을 원칙으로 한다.
