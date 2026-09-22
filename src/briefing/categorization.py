@@ -3,49 +3,14 @@
 from __future__ import annotations
 
 from collections import defaultdict
-import re
-import unicodedata
 
 from .schema import BriefingItem, CategoryDecision
 
 
-WORK = "업무"
-SCHEDULE = "일정"
-CHAT = "잡담"
-
-_CATEGORY_HINTS = {
-    SCHEDULE: ("일정", "캘린더", "회의", "약속", "마감", "기한", "예약"),
-    CHAT: ("잡담", "일상", "친구", "단톡", "광고", "홍보", "소셜"),
-    WORK: ("업무", "긴급", "개발", "학업", "과제", "프로젝트", "공지"),
-}
-_DATE_OR_TIME_PATTERN = re.compile(
-    r"(?:\d{1,2}[월/.]\s*\d{1,2}일?|\d{1,2}:\d{2}|오늘|내일|모레|회의|일정|마감|기한)"
-)
-
-
-def _normalized(value: str) -> str:
-    return unicodedata.normalize("NFKC", value).casefold()
-
-
 def canonical_category(item: BriefingItem) -> str:
-    """Map an item to one of the temporary README-level categories.
+    """Preserve the official category produced by the filtering pipeline."""
 
-    The existing filter category is considered first.  Text hints are only a
-    deterministic fallback for categories not covered by the temporary map.
-    """
-
-    category = _normalized(item.filter_result.category)
-    for canonical in (SCHEDULE, CHAT, WORK):
-        if any(hint in category for hint in _CATEGORY_HINTS[canonical]):
-            return canonical
-
-    notification = item.notification
-    text = _normalized(f"{notification.title} {notification.body}")
-    if _DATE_OR_TIME_PATTERN.search(text):
-        return SCHEDULE
-    if any(hint in text for hint in _CATEGORY_HINTS[CHAT]):
-        return CHAT
-    return WORK
+    return item.filter_result.category
 
 
 def categorize_group(items: list[BriefingItem]) -> CategoryDecision:

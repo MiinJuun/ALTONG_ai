@@ -33,7 +33,7 @@ def filter_result(
         "is_passed": is_passed,
         "urgency_score": 3,
         "relevance_score": 4,
-        "category": "업무",
+        "category": "일반 업무",
         "ai_summary_reason": "가상 테스트 판단",
     }
 

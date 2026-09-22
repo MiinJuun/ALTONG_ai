@@ -6,7 +6,7 @@ from pathlib import Path
 import unittest
 
 from src.briefing.pipeline import SessionBriefingService
-from src.briefing.schema import ContractValidationError
+from src.briefing.schema import ContractValidationError, FILTER_CATEGORIES
 
 
 FIXTURE_DIR = (
@@ -44,7 +44,7 @@ def filter_result(
     is_passed: bool = False,
     urgency: int = 3,
     relevance: int = 3,
-    category: str = "가상 테스트",
+    category: str = "일반 업무",
 ) -> dict[str, object]:
     return {
         "notification_id": notification_id,
@@ -86,6 +86,31 @@ class BriefingPipelineTests(unittest.TestCase):
                         filter_results=[filter_result("n1", **invalid_score)],
                         generated_at=self.generated_at,
                     )
+
+    def test_only_official_filter_categories_are_accepted(self) -> None:
+        for category in FILTER_CATEGORIES:
+            with self.subTest(category=category):
+                briefing = self.service.build(
+                    session_id="session_official_category",
+                    notifications=[notification("n1")],
+                    filter_results=[filter_result("n1", category=category)],
+                    generated_at=self.generated_at,
+                ).to_dict()
+                self.assertEqual(
+                    briefing["groups"][0]["primary_category"],
+                    category,
+                )
+
+        with self.assertRaisesRegex(
+            ContractValidationError,
+            "official filtering categories",
+        ):
+            self.service.build(
+                session_id="session_invalid_category",
+                notifications=[notification("n1")],
+                filter_results=[filter_result("n1", category="업무")],
+                generated_at=self.generated_at,
+            )
 
     def test_build_json_returns_parseable_structured_output(self) -> None:
         encoded = self.service.build_json(
@@ -162,8 +187,8 @@ class BriefingPipelineTests(unittest.TestCase):
             ),
         ]
         results = [
-            filter_result("n1", category="업무", urgency=5, relevance=5),
-            filter_result("n2", category="일정", urgency=1, relevance=1),
+            filter_result("n1", category="일반 업무", urgency=5, relevance=5),
+            filter_result("n2", category="일정/회의", urgency=1, relevance=1),
         ]
 
         group = self.service.build(
@@ -173,8 +198,33 @@ class BriefingPipelineTests(unittest.TestCase):
             generated_at=self.generated_at,
         ).to_dict()["groups"][0]
 
-        self.assertEqual(group["primary_category"], "일정")
+        self.assertEqual(group["primary_category"], "일정/회의")
         self.assertEqual(group["category_evidence_notification_ids"], ["n2"])
+
+    def test_group_category_uses_majority_before_latest_notification(self) -> None:
+        notifications = [
+            notification("n1", timestamp="2026-09-13T18:05:00Z"),
+            notification("n2", timestamp="2026-09-13T18:15:00Z"),
+            notification("n3", timestamp="2026-09-13T18:30:00Z"),
+        ]
+        results = [
+            filter_result("n1", category="시스템/보안"),
+            filter_result("n2", category="시스템/보안"),
+            filter_result("n3", category="긴급 업무"),
+        ]
+
+        group = self.service.build(
+            session_id="session_category_majority",
+            notifications=notifications,
+            filter_results=results,
+            generated_at=self.generated_at,
+        ).to_dict()["groups"][0]
+
+        self.assertEqual(group["primary_category"], "시스템/보안")
+        self.assertEqual(
+            group["category_evidence_notification_ids"],
+            ["n1", "n2"],
+        )
 
     def test_rule_based_summary_is_extractive_and_limited_to_three_lines(self) -> None:
         notifications = [
@@ -208,7 +258,7 @@ class BriefingPipelineTests(unittest.TestCase):
             group["summary_lines"],
         )
 
-    def test_blocked_chat_group_is_categorized_as_chat(self) -> None:
+    def test_blocked_personal_group_preserves_filter_category(self) -> None:
         group = self.service.build(
             session_id="session_chat",
             notifications=[
@@ -220,11 +270,11 @@ class BriefingPipelineTests(unittest.TestCase):
                     body="저녁 메뉴를 같이 정해 보자.",
                 )
             ],
-            filter_results=[filter_result("n1", category="잡담")],
+            filter_results=[filter_result("n1", category="개인 일반")],
             generated_at=self.generated_at,
         ).to_dict()["groups"][0]
 
-        self.assertEqual(group["primary_category"], "잡담")
+        self.assertEqual(group["primary_category"], "개인 일반")
 
     def test_fixture_filters_passed_items_and_aggregates_scores(self) -> None:
         briefing = self.service.build(
@@ -252,7 +302,7 @@ class BriefingPipelineTests(unittest.TestCase):
         )
         self.assertEqual(server_group["urgency_score"], {"min": 4, "max": 5, "average": 4.5})
         self.assertEqual(server_group["relevance_score"], {"min": 4, "max": 4, "average": 4.0})
-        self.assertEqual(server_group["primary_category"], "업무")
+        self.assertEqual(server_group["primary_category"], "일반 업무")
         self.assertLessEqual(len(server_group["summary_lines"]), 3)
 
     def test_legacy_timezone_less_timestamp_is_accepted_and_output_as_utc(self) -> None:
