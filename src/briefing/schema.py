@@ -12,6 +12,19 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 
 
+FILTER_CATEGORIES = (
+    "긴급 업무",
+    "일반 업무",
+    "일정/회의",
+    "시스템/보안",
+    "개인 중요",
+    "개인 일반",
+    "광고/홍보",
+    "기타",
+)
+_FILTER_CATEGORY_SET = frozenset(FILTER_CATEGORIES)
+
+
 class ContractValidationError(ValueError):
     """Raised when input data cannot satisfy the temporary MVP contract."""
 
@@ -65,6 +78,16 @@ def _score(data: Mapping[str, Any], field: str) -> int:
     return value
 
 
+def _filter_category(data: Mapping[str, Any]) -> str:
+    category = _required_string(data, "category")
+    if category not in _FILTER_CATEGORY_SET:
+        allowed = ", ".join(FILTER_CATEGORIES)
+        raise ContractValidationError(
+            f"category must be one of the official filtering categories: {allowed}"
+        )
+    return category
+
+
 @dataclass(frozen=True, slots=True)
 class RawNotification:
     id: str
@@ -105,7 +128,7 @@ class FilterResult:
             is_passed=is_passed,
             urgency_score=_score(data, "urgency_score"),
             relevance_score=_score(data, "relevance_score"),
-            category=_required_string(data, "category"),
+            category=_filter_category(data),
             ai_summary_reason=_required_string(data, "ai_summary_reason"),
         )
 
