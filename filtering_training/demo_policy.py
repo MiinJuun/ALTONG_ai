@@ -1,4 +1,4 @@
-from policy import decision_label
+from src.filtering.policy import decision_label
 
 
 samples = [

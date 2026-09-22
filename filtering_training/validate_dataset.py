@@ -1,10 +1,10 @@
 import json
 from pathlib import Path
 
-from schema import FilteringSample
+from src.filtering.schema import FilteringSample
 
 
-DATASET_PATH = Path("data/sample/filtering/sample_notifications.jsonl")
+DATASET_PATH = Path(__file__).resolve().parent / "data" / "sample_notifications.jsonl"
 
 
 def validate_dataset():

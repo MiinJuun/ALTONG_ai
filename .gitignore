@@ -11,3 +11,8 @@ __pycache__/
 
 # Training outputs / model files
 outputs/
+*.pt
+*.pth
+*.safetensors
+
+AI_CONTEXT.md

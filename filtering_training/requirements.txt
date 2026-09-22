@@ -1,7 +1,6 @@
+-r ../requirements.txt
+
 pandas
-pydantic
-torch
-transformers
 datasets
 trl
 peft
