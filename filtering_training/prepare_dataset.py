@@ -110,7 +110,7 @@ def prepare_dataset(dataset: Path, output_dir: Path, seed: int = 42) -> dict:
     manifest = {
         "source_sha256": hashlib.sha256(dataset.read_bytes()).hexdigest(),
         "seed": seed,
-        "purpose": "pipeline smoke test; 34 examples are insufficient for quality claims",
+        "purpose": "pipeline smoke test; synthetic examples require broader review before quality claims",
         "splits": {},
     }
     for name, items in splits.items():

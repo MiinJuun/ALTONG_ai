@@ -21,7 +21,7 @@ class PrepareDatasetTests(unittest.TestCase):
                 for name, info in manifest["splits"].items()
                 for notification_id in info["notification_ids"]
             }
-            self.assertEqual(len(split_for_id), 34)
+            self.assertEqual(len(split_for_id), len(load_samples(DATASET_PATH)))
             self.assertEqual(split_for_id["noti_031"], split_for_id["noti_032"])
             samples_by_id = {s.notification.id: s for s in load_samples(DATASET_PATH)}
             for name in ("validation", "test"):

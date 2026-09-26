@@ -90,7 +90,8 @@ def score_predictions(
 
 def evaluate(
     dataset: Path, prepared_dir: Path, split: str, model_name: str,
-    adapter: Path | None, output: Path
+    adapter: Path | None, output: Path, example_count: int = 0,
+    examples_output: Path | None = None
 ) -> dict:
     import torch
     import transformers
@@ -145,6 +146,21 @@ def evaluate(
         },
         "metrics": score_predictions([sample.label for sample in samples], predictions),
     }
+    if example_count:
+        examples = [
+            {
+                "notification_id": sample.notification.id,
+                "model_output": prediction.model_dump() if prediction is not None else None,
+            }
+            for sample, prediction in zip(samples, predictions)
+        ][:example_count]
+        examples_json = json.dumps(
+            {"prediction_examples": examples}, ensure_ascii=False, indent=2
+        ) + "\n"
+        print(examples_json)
+        if examples_output is not None:
+            examples_output.parent.mkdir(parents=True, exist_ok=True)
+            examples_output.write_text(examples_json, encoding="utf-8")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return report
@@ -158,12 +174,18 @@ def main() -> None:
     parser.add_argument("--model", default=MODEL_NAME)
     parser.add_argument("--adapter", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--examples-output", type=Path)
+    parser.add_argument("--show-examples", type=int, default=3,
+                        help="print this many model JSON outputs (default: 3)")
     args = parser.parse_args()
+    if args.show_examples < 0:
+        parser.error("--show-examples must be non-negative")
     output = args.output or EVALUATION_DIR / (
         ("adapter" if args.adapter else "base") + f"_{args.split}.json"
     )
     report = evaluate(args.dataset, args.prepared_dir, args.split,
-                      args.model, args.adapter, output)
+                      args.model, args.adapter, output, args.show_examples,
+                      args.examples_output)
     print(json.dumps(report["metrics"], ensure_ascii=False, indent=2))
     print(f"Report: {output}")
 

@@ -46,11 +46,12 @@ python -m filtering_training.prepare_dataset
 ```
 
 The command validates the samples and writes train, validation, and test JSONL
-files plus a split manifest to `filtering_training/outputs/prepared`. The 34
+files plus a split manifest to `filtering_training/outputs/prepared`. The
 current synthetic examples are only for pipeline checks. Notifications with the
 same text and different contexts stay in one split. The assistant target contains
 only the four model label fields; the prompt includes the normalized current
 context. The three splits are not a reliable quality benchmark yet.
+
 ## Baseline evaluation and LoRA smoke run
 
 ```powershell
@@ -60,12 +61,25 @@ python -m filtering_training.evaluate --split test --adapter filtering_training/
 ```
 
 Run `prepare_dataset` first. Evaluation writes aggregate metrics and run metadata
-to `filtering_training/outputs/evaluation`; it does not save raw notifications or
-model responses. The trainer saves a LoRA adapter and run settings under
+to `filtering_training/outputs/evaluation`; it does not save raw notifications.
+Model responses are not saved unless `--examples-output` is provided. By default, evaluation prints three model JSON examples; use
+`--examples-output PATH` to save those examples as UTF-8 JSON. Record reviewed
+experiment results and 3-5 examples in `docs/filtering-experiment-log.md`.
+The trainer saves a LoRA adapter and run settings under
 `filtering_training/outputs/lora-smoke`. It trains only on the assistant JSON
 completion and verifies that prompt tokens are masked from the loss. On GPUs that
 support it, the trainer uses BF16; otherwise it uses FP16.
 
-The current test split has three synthetic examples, including one urgent
-notification. These numbers confirm that the pipeline runs but cannot establish
+The original 34-sample test split had three synthetic examples, including one urgent
+notification. Its saved base/adapter reports belong to that dataset snapshot. Run
+the baseline again after changing the dataset or split. These numbers cannot establish
 model quality. The next quality step is a larger, independently reviewed dataset.
+
+## Synthetic data audit
+
+```powershell
+python -m filtering_training.audit_dataset
+```
+
+This writes aggregate label and context coverage to
+`filtering_training/outputs/audit/dataset_audit.json`. Review the aggregate findings before expanding the dataset.
