@@ -21,9 +21,10 @@ SYSTEM_PROMPT = """당신은 PC 집중 세션이 끝난 뒤 차단된 알림을 
 5. 제목만 나열하지 말고 본문에 있는 핵심 사실을 포함하세요.
 6. 일정과 제출 알림은 날짜, 시간, 제출물 등 사용자가 행동하는 데 필요한 정보를 보존하세요.
 7. 각 줄은 알림 표시나 필드 이름 없이 그 자체로 이해되는 완전한 문장이어야 합니다.
-8. 한국어로 짧게 작성하고 요약은 최대 3줄까지만 만드세요.
+8. 한국어로 짧게 작성하고 사용자 메시지에 지정된 최대 요약 줄 수를 지키세요.
 9. 마크다운, 설명, 사고 과정 없이 아래 JSON 객체 하나만 출력하세요.
 10. 최상위 값은 배열이 아니라 반드시 summary_lines 필드가 있는 객체여야 합니다.
+11. 상태가 이어지는 알림은 제목과 상태를 따로 나열하지 말고 최신 상태가 담긴 완전한 문장으로 합치세요.
 
 출력 스키마:
 {"summary_lines":["첫 번째 요약", "두 번째 요약"]}
@@ -34,6 +35,28 @@ SYSTEM_PROMPT = """당신은 PC 집중 세션이 끝난 뒤 차단된 알림을 
 올바른 출력:
 {"summary_lines":["첫 번째 요약", "두 번째 요약"]}
 """
+
+EXAMPLE_GROUP = {
+    "app_name": "Calendar",
+    "sender": "가상 프로젝트 리더",
+    "category": "일정/회의",
+    "urgency_score": "min=2, max=3, average=2.5",
+    "relevance_score": "min=4, max=5, average=4.5",
+    "notifications_oldest_to_newest": [
+        {
+            "timestamp": "2026-09-25T13:00:00Z",
+            "title": "주간 회의 시간 변경",
+            "body": "오늘 주간 회의를 오후 4시로 변경합니다.",
+        },
+        {
+            "timestamp": "2026-09-25T15:00:00Z",
+            "title": "주간 회의 취소",
+            "body": "오늘 오후 4시 주간 회의는 취소되었습니다.",
+        },
+    ],
+}
+
+EXAMPLE_RESPONSE = '{"summary_lines":["오늘 오후 4시 주간 회의가 취소되었습니다."]}'
 
 
 class SummaryResponseError(ValueError):
@@ -56,8 +79,44 @@ def _score_text(value: object) -> str:
     return str(value)
 
 
-def build_messages(group: Mapping[str, Any]) -> list[dict[str, str]]:
+def _validate_max_summary_lines(max_summary_lines: int) -> int:
+    if (
+        isinstance(max_summary_lines, bool)
+        or not isinstance(max_summary_lines, int)
+        or not 1 <= max_summary_lines <= MAX_SUMMARY_LINES
+    ):
+        raise ValueError("max_summary_lines must be an integer from 1 to 3")
+    return max_summary_lines
+
+
+def _build_user_prompt(
+    group_context: Mapping[str, Any], max_summary_lines: int
+) -> str:
+    return "\n".join(
+        (
+            "다음 알림 그룹을 요약하세요.",
+            f"최대 요약 줄 수: {max_summary_lines}",
+            "",
+            "입력 JSON:",
+            json.dumps(group_context, ensure_ascii=False, separators=(",", ":")),
+            "",
+            "제목만 복사하지 말고 body의 구체적인 핵심 사실을 포함하세요.",
+            "최신 알림이 취소, 변경, 복구를 알리면 이전 상태를 버리고 최종 상태만 쓰세요.",
+            "같은 사건의 제목과 상태를 별도 줄로 나열하지 말고 완전한 문장으로 합치세요.",
+            "입력의 id, 필드 이름, '알림 1' 같은 표시는 출력하지 마세요.",
+            f"summary_lines 배열에는 최대 {max_summary_lines}개의 문장만 넣으세요.",
+            "반드시 { 문자로 시작하고 } 문자로 끝나는 JSON 객체만 출력하세요.",
+            '형식: {"summary_lines":["요약 문장"]}',
+        )
+    )
+
+
+def build_messages(
+    group: Mapping[str, Any], *, max_summary_lines: int = MAX_SUMMARY_LINES
+) -> list[dict[str, str]]:
     """Build Qwen chat messages from one already-grouped notification unit."""
+
+    max_summary_lines = _validate_max_summary_lines(max_summary_lines)
 
     notifications = group.get("notifications")
     if not isinstance(notifications, Sequence) or isinstance(notifications, (str, bytes)):
@@ -69,9 +128,9 @@ def build_messages(group: Mapping[str, Any]) -> list[dict[str, str]]:
     for notification in notifications:
         if not isinstance(notification, Mapping):
             raise ValueError("each notification must be an object")
+        _required_text(notification, "id")
         notification_records.append(
             {
-                "id": _required_text(notification, "id"),
                 "timestamp": _required_text(notification, "timestamp"),
                 "title": _required_text(notification, "title"),
                 "body": _required_text(notification, "body"),
@@ -86,22 +145,11 @@ def build_messages(group: Mapping[str, Any]) -> list[dict[str, str]]:
         "relevance_score": _score_text(group.get("relevance_score")),
         "notifications_oldest_to_newest": notification_records,
     }
-    user_prompt = "\n".join(
-        (
-            "다음 알림 그룹을 요약하세요.",
-            "",
-            "입력 JSON:",
-            json.dumps(group_context, ensure_ascii=False, separators=(",", ":")),
-            "",
-            "제목만 복사하지 말고 body의 구체적인 핵심 사실을 포함하세요.",
-            "최신 알림이 취소, 변경, 복구를 알리면 그 최종 상태를 분명히 쓰세요.",
-            "입력의 id, 필드 이름, '알림 1' 같은 표시는 출력하지 마세요.",
-            "반드시 { 문자로 시작하고 } 문자로 끝나는 JSON 객체만 출력하세요.",
-            '형식: {"summary_lines":["요약 문장"]}',
-        )
-    )
+    user_prompt = _build_user_prompt(group_context, max_summary_lines)
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": _build_user_prompt(EXAMPLE_GROUP, 1)},
+        {"role": "assistant", "content": EXAMPLE_RESPONSE},
         {"role": "user", "content": user_prompt},
     ]
 

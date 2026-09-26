@@ -71,16 +71,17 @@ def main() -> None:
         if not isinstance(group, Mapping):
             raise ValueError(f"case {index} does not contain an input object")
 
+        max_summary_lines = _max_summary_lines(case)
         raw_response, elapsed_seconds = generate_summary(
             tokenizer=tokenizer,
             model=model,
             group=group,
+            max_summary_lines=max_summary_lines,
             seed=42 + index,
         )
         latencies.append(elapsed_seconds)
         expected_facts = _expected_facts(case)
         forbidden_phrases = _forbidden_phrases(case)
-        max_summary_lines = _max_summary_lines(case)
         fact_total += len(expected_facts)
 
         try:

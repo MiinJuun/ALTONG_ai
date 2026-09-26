@@ -31,17 +31,25 @@ SYNTHETIC_GROUP = {
 
 class QwenSummaryBaselineTests(unittest.TestCase):
     def test_prompt_contains_group_context_and_output_contract(self) -> None:
-        messages = build_messages(SYNTHETIC_GROUP)
+        messages = build_messages(SYNTHETIC_GROUP, max_summary_lines=1)
+        actual_prompt = messages[-1]["content"]
 
-        self.assertEqual([message["role"] for message in messages], ["system", "user"])
+        self.assertEqual(
+            [message["role"] for message in messages],
+            ["system", "user", "assistant", "user"],
+        )
         self.assertIn('"summary_lines"', messages[0]["content"])
         self.assertIn("최상위 값은 배열이 아니라", messages[0]["content"])
-        self.assertIn("가상 서버 오류", messages[1]["content"])
-        self.assertIn("긴급 업무", messages[1]["content"])
-        self.assertIn("notifications_oldest_to_newest", messages[1]["content"])
-        self.assertNotIn("[알림 1]", messages[1]["content"])
-        self.assertIn("제목만 복사하지 말고", messages[1]["content"])
-        self.assertIn("반드시 { 문자로 시작", messages[1]["content"])
+        self.assertIn("가상 서버 오류", actual_prompt)
+        self.assertIn("긴급 업무", actual_prompt)
+        self.assertIn("notifications_oldest_to_newest", actual_prompt)
+        self.assertNotIn("noti_test_001", actual_prompt)
+        self.assertNotIn("[알림 1]", actual_prompt)
+        self.assertIn("최대 요약 줄 수: 1", actual_prompt)
+        self.assertIn("최대 1개의 문장", actual_prompt)
+        self.assertIn("제목만 복사하지 말고", actual_prompt)
+        self.assertIn("반드시 { 문자로 시작", actual_prompt)
+        self.assertIn("오후 4시 주간 회의가 취소", messages[2]["content"])
 
     def test_parser_accepts_one_to_three_summary_lines(self) -> None:
         parsed = parse_summary_response(
@@ -84,6 +92,10 @@ class QwenSummaryBaselineTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "must not be empty"):
             build_messages(group)
+
+    def test_invalid_max_summary_lines_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "integer from 1 to 3"):
+            build_messages(SYNTHETIC_GROUP, max_summary_lines=4)
 
     def test_evaluation_case_supports_fact_alternatives_and_latest_state(self) -> None:
         case = {

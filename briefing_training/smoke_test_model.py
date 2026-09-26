@@ -8,7 +8,12 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any, Mapping
 
-from .prompts import MODEL_NAME, build_messages, parse_summary_response
+from .prompts import (
+    MAX_SUMMARY_LINES,
+    MODEL_NAME,
+    build_messages,
+    parse_summary_response,
+)
 
 
 DEFAULT_CASES_PATH = Path(__file__).with_name("data") / "evaluation_cases.jsonl"
@@ -53,6 +58,7 @@ def generate_summary(
     tokenizer: Any,
     model: Any,
     group: Mapping[str, Any],
+    max_summary_lines: int = MAX_SUMMARY_LINES,
     seed: int = 42,
 ) -> tuple[str, float]:
     import torch
@@ -62,7 +68,7 @@ def generate_summary(
         torch.cuda.manual_seed_all(seed)
 
     prompt = tokenizer.apply_chat_template(
-        build_messages(group),
+        build_messages(group, max_summary_lines=max_summary_lines),
         tokenize=False,
         add_generation_prompt=True,
         enable_thinking=False,
@@ -101,6 +107,13 @@ def main() -> None:
     group = case.get("input")
     if not isinstance(group, Mapping):
         raise SystemExit("selected case does not contain an input object")
+    max_summary_lines = case.get("max_summary_lines", MAX_SUMMARY_LINES)
+    if (
+        isinstance(max_summary_lines, bool)
+        or not isinstance(max_summary_lines, int)
+        or not 1 <= max_summary_lines <= MAX_SUMMARY_LINES
+    ):
+        raise SystemExit("selected case has an invalid max_summary_lines value")
 
     print(f"Model: {MODEL_NAME}")
     print(f"Case: {case.get('case_id', args.case_index)}")
@@ -110,6 +123,7 @@ def main() -> None:
         tokenizer=tokenizer,
         model=model,
         group=group,
+        max_summary_lines=max_summary_lines,
     )
 
     print("\n=== Raw response ===")
@@ -127,4 +141,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
