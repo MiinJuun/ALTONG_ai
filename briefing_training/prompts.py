@@ -17,9 +17,12 @@ SYSTEM_PROMPT = """당신은 PC 집중 세션이 끝난 뒤 차단된 알림을 
 2. 동일한 사건의 반복 알림은 하나의 흐름으로 합치세요.
 3. 변경, 취소, 복구처럼 상태가 달라졌다면 가장 최신 알림의 상태를 우선하세요.
 4. 긴급도와 연관도가 높은 내용을 먼저 쓰세요.
-5. 한국어로 짧게 작성하고 요약은 최대 3줄까지만 만드세요.
-6. 마크다운, 설명, 사고 과정 없이 아래 JSON 객체 하나만 출력하세요.
-7. 최상위 값은 배열이 아니라 반드시 summary_lines 필드가 있는 객체여야 합니다.
+5. 제목만 나열하지 말고 본문에 있는 핵심 사실을 포함하세요.
+6. 일정과 제출 알림은 날짜, 시간, 제출물 등 사용자가 행동하는 데 필요한 정보를 보존하세요.
+7. 각 줄은 알림 표시나 필드 이름 없이 그 자체로 이해되는 완전한 문장이어야 합니다.
+8. 한국어로 짧게 작성하고 요약은 최대 3줄까지만 만드세요.
+9. 마크다운, 설명, 사고 과정 없이 아래 JSON 객체 하나만 출력하세요.
+10. 최상위 값은 배열이 아니라 반드시 summary_lines 필드가 있는 객체여야 합니다.
 
 출력 스키마:
 {"summary_lines":["첫 번째 요약", "두 번째 요약"]}
@@ -61,31 +64,37 @@ def build_messages(group: Mapping[str, Any]) -> list[dict[str, str]]:
     if not notifications:
         raise ValueError("notifications must not be empty")
 
-    lines: list[str] = []
-    for index, notification in enumerate(notifications, start=1):
+    notification_records: list[dict[str, str]] = []
+    for notification in notifications:
         if not isinstance(notification, Mapping):
             raise ValueError("each notification must be an object")
-        lines.extend(
-            (
-                f"[알림 {index}]",
-                f"id: {_required_text(notification, 'id')}",
-                f"timestamp: {_required_text(notification, 'timestamp')}",
-                f"title: {_required_text(notification, 'title')}",
-                f"body: {_required_text(notification, 'body')}",
-            )
+        notification_records.append(
+            {
+                "id": _required_text(notification, "id"),
+                "timestamp": _required_text(notification, "timestamp"),
+                "title": _required_text(notification, "title"),
+                "body": _required_text(notification, "body"),
+            }
         )
 
+    group_context = {
+        "app_name": _required_text(group, "app_name"),
+        "sender": _required_text(group, "sender"),
+        "category": _required_text(group, "category"),
+        "urgency_score": _score_text(group.get("urgency_score")),
+        "relevance_score": _score_text(group.get("relevance_score")),
+        "notifications_oldest_to_newest": notification_records,
+    }
     user_prompt = "\n".join(
         (
             "다음 알림 그룹을 요약하세요.",
-            f"app_name: {_required_text(group, 'app_name')}",
-            f"sender: {_required_text(group, 'sender')}",
-            f"category: {_required_text(group, 'category')}",
-            f"urgency_score: {_score_text(group.get('urgency_score'))}",
-            f"relevance_score: {_score_text(group.get('relevance_score'))}",
             "",
-            *lines,
+            "입력 JSON:",
+            json.dumps(group_context, ensure_ascii=False, separators=(",", ":")),
             "",
+            "제목만 복사하지 말고 body의 구체적인 핵심 사실을 포함하세요.",
+            "최신 알림이 취소, 변경, 복구를 알리면 그 최종 상태를 분명히 쓰세요.",
+            "입력의 id, 필드 이름, '알림 1' 같은 표시는 출력하지 마세요.",
             "반드시 { 문자로 시작하고 } 문자로 끝나는 JSON 객체만 출력하세요.",
             '형식: {"summary_lines":["요약 문장"]}',
         )

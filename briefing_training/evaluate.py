@@ -1,4 +1,4 @@
-"""Evaluate structured-output and keyword coverage on synthetic cases."""
+"""Evaluate structured output and source-fact coverage on synthetic cases."""
 
 from __future__ import annotations
 
@@ -16,13 +16,24 @@ from .smoke_test_model import (
 )
 
 
-def _expected_keywords(case: Mapping[str, Any]) -> tuple[str, ...]:
-    keywords = case.get("expected_keywords", [])
-    if not isinstance(keywords, list) or not all(
-        isinstance(keyword, str) and keyword.strip() for keyword in keywords
-    ):
-        raise ValueError("expected_keywords must be an array of non-empty strings")
-    return tuple(keyword.strip() for keyword in keywords)
+def _expected_facts(case: Mapping[str, Any]) -> tuple[tuple[str, ...], ...]:
+    facts = case.get("expected_facts", [])
+    if not isinstance(facts, list):
+        raise ValueError("expected_facts must be an array")
+
+    normalized: list[tuple[str, ...]] = []
+    for fact in facts:
+        if not isinstance(fact, list) or not all(
+            isinstance(alternative, str) and alternative.strip()
+            for alternative in fact
+        ):
+            raise ValueError(
+                "each expected fact must be an array of alternative phrases"
+            )
+        if not fact:
+            raise ValueError("each expected fact must contain an alternative")
+        normalized.append(tuple(alternative.strip() for alternative in fact))
+    return tuple(normalized)
 
 
 def main() -> None:
@@ -33,8 +44,8 @@ def main() -> None:
     cases = load_cases(args.cases)
     tokenizer, model = load_model()
     structured_count = 0
-    keyword_hits = 0
-    keyword_total = 0
+    fact_hits = 0
+    fact_total = 0
     latencies: list[float] = []
     results: list[dict[str, Any]] = []
 
@@ -50,15 +61,18 @@ def main() -> None:
             seed=42 + index,
         )
         latencies.append(elapsed_seconds)
-        expected_keywords = _expected_keywords(case)
-        keyword_total += len(expected_keywords)
+        expected_facts = _expected_facts(case)
+        fact_total += len(expected_facts)
 
         try:
             summary_lines = parse_summary_response(raw_response)
             structured_count += 1
             combined = " ".join(summary_lines)
-            hits = sum(keyword in combined for keyword in expected_keywords)
-            keyword_hits += hits
+            hits = sum(
+                any(alternative in combined for alternative in alternatives)
+                for alternatives in expected_facts
+            )
+            fact_hits += hits
             error = None
         except ValueError as exc:
             summary_lines = ()
@@ -69,8 +83,8 @@ def main() -> None:
             {
                 "case_id": case.get("case_id", index),
                 "structured_output": error is None,
-                "keyword_hits": hits,
-                "keyword_total": len(expected_keywords),
+                "fact_hits": hits,
+                "fact_total": len(expected_facts),
                 "latency_seconds": round(elapsed_seconds, 2),
                 "summary_lines": list(summary_lines),
                 "error": error,
@@ -82,8 +96,8 @@ def main() -> None:
         "model": MODEL_NAME,
         "case_count": len(cases),
         "structured_output_rate": round(structured_count / len(cases), 4),
-        "keyword_coverage": round(keyword_hits / keyword_total, 4)
-        if keyword_total
+        "fact_coverage": round(fact_hits / fact_total, 4)
+        if fact_total
         else None,
         "average_latency_seconds": round(sum(latencies) / len(latencies), 2),
         "results": results,
@@ -93,4 +107,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
