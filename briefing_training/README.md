@@ -77,3 +77,18 @@ The training command uses 4-bit NF4 quantization and trains only LoRA adapter
 parameters. The base model remains unchanged. Training outputs must stay in
 Google Drive or the ignored local `outputs` directory and must not be committed
 to Git.
+
+## Evaluate a trained adapter
+
+Run the same fixed evaluation set with the saved adapter and optionally write
+the JSON report to a file:
+
+```powershell
+python -m briefing_training.evaluate `
+  --adapter-path /content/drive/MyDrive/ALTONG_models/briefing-qwen-lora `
+  --output /content/drive/MyDrive/ALTONG_models/briefing-qwen-lora/evaluation.json
+```
+
+The adapter evaluation must use `data/evaluation_cases.jsonl`, which is kept
+separate from the training and validation data. Compare its structured output
+rate, case pass rate, fact coverage, and latency with the base-model report.
