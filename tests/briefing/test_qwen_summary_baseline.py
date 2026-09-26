@@ -30,8 +30,10 @@ class QwenSummaryBaselineTests(unittest.TestCase):
 
         self.assertEqual([message["role"] for message in messages], ["system", "user"])
         self.assertIn('"summary_lines"', messages[0]["content"])
+        self.assertIn("최상위 값은 배열이 아니라", messages[0]["content"])
         self.assertIn("가상 서버 오류", messages[1]["content"])
         self.assertIn("긴급 업무", messages[1]["content"])
+        self.assertIn("반드시 { 문자로 시작", messages[1]["content"])
 
     def test_parser_accepts_one_to_three_summary_lines(self) -> None:
         parsed = parse_summary_response(
@@ -78,4 +80,3 @@ class QwenSummaryBaselineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

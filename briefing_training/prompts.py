@@ -18,9 +18,16 @@ SYSTEM_PROMPT = """당신은 PC 집중 세션이 끝난 뒤 차단된 알림을 
 3. 변경, 취소, 복구처럼 상태가 달라졌다면 가장 최신 알림의 상태를 우선하세요.
 4. 긴급도와 연관도가 높은 내용을 먼저 쓰세요.
 5. 한국어로 짧게 작성하고 요약은 최대 3줄까지만 만드세요.
-6. 마크다운, 설명, 사고 과정 없이 아래 JSON 객체만 출력하세요.
+6. 마크다운, 설명, 사고 과정 없이 아래 JSON 객체 하나만 출력하세요.
+7. 최상위 값은 배열이 아니라 반드시 summary_lines 필드가 있는 객체여야 합니다.
 
 출력 스키마:
+{"summary_lines":["첫 번째 요약", "두 번째 요약"]}
+
+잘못된 출력:
+["첫 번째 요약", "두 번째 요약"]
+
+올바른 출력:
 {"summary_lines":["첫 번째 요약", "두 번째 요약"]}
 """
 
@@ -78,6 +85,9 @@ def build_messages(group: Mapping[str, Any]) -> list[dict[str, str]]:
             f"relevance_score: {_score_text(group.get('relevance_score'))}",
             "",
             *lines,
+            "",
+            "반드시 { 문자로 시작하고 } 문자로 끝나는 JSON 객체만 출력하세요.",
+            '형식: {"summary_lines":["요약 문장"]}',
         )
     )
     return [
@@ -126,4 +136,3 @@ def parse_summary_response(raw_response: str) -> tuple[str, ...]:
             )
         normalized.append(text)
     return tuple(normalized)
-
