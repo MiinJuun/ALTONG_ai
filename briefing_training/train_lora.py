@@ -142,7 +142,7 @@ def train(
         gradient_accumulation_steps=gradient_accumulation_steps,
         learning_rate=learning_rate,
         lr_scheduler_type="cosine",
-        warmup_ratio=0.05,
+        warmup_steps=2,
         logging_steps=5,
         eval_strategy="epoch",
         save_strategy="epoch",
