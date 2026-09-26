@@ -73,6 +73,11 @@ run the cells in order. The notebook installs the dependencies from
 `requirements-lora.txt`, validates the synthetic data, and saves the adapter
 under `MyDrive/ALTONG_models/briefing-qwen-lora`.
 
+The notebook removes Colab's preinstalled `torchao` before installing the
+training dependencies. This project uses bitsandbytes NF4 rather than torchao,
+and an older preinstalled torchao release can prevent current PEFT versions
+from loading the saved adapter.
+
 The training command uses 4-bit NF4 quantization and trains only LoRA adapter
 parameters. The base model remains unchanged. Training outputs must stay in
 Google Drive or the ignored local `outputs` directory and must not be committed
