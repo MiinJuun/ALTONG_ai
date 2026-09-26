@@ -28,3 +28,44 @@ python -m filtering_training.smoke_test_model
 
 Generated checkpoints, adapters, and experiment outputs belong under
 `filtering_training/outputs` and must not be committed.
+
+## One-sample model check
+
+```powershell
+python -m filtering_training.infer_sample --sample-index 0
+```
+
+This runs `Qwen/Qwen3-0.6B` with thinking disabled, validates the four-field
+label JSON, and applies the existing policy. The base model has not been
+fine-tuned, so this command checks the input/output path rather than accuracy.
+
+## Prepare SFT data
+
+```powershell
+python -m filtering_training.prepare_dataset
+```
+
+The command validates the samples and writes train, validation, and test JSONL
+files plus a split manifest to `filtering_training/outputs/prepared`. The 34
+current synthetic examples are only for pipeline checks. Notifications with the
+same text and different contexts stay in one split. The assistant target contains
+only the four model label fields; the prompt includes the normalized current
+context. The three splits are not a reliable quality benchmark yet.
+## Baseline evaluation and LoRA smoke run
+
+```powershell
+python -m filtering_training.evaluate --split test
+python -m filtering_training.train --max-steps 2
+python -m filtering_training.evaluate --split test --adapter filtering_training/outputs/lora-smoke/adapter
+```
+
+Run `prepare_dataset` first. Evaluation writes aggregate metrics and run metadata
+to `filtering_training/outputs/evaluation`; it does not save raw notifications or
+model responses. The trainer saves a LoRA adapter and run settings under
+`filtering_training/outputs/lora-smoke`. It trains only on the assistant JSON
+completion and verifies that prompt tokens are masked from the loss. On GPUs that
+support it, the trainer uses BF16; otherwise it uses FP16.
+
+The current test split has three synthetic examples, including one urgent
+notification. These numbers confirm that the pipeline runs but cannot establish
+model quality. The next quality step is a larger, independently reviewed dataset.

@@ -46,17 +46,30 @@ ALTONG 필터링 AI는 현재 작업 맥락(`CurrentContext`)과 수신 알림(`
 
 ### CurrentContext
 
-- `active_process`
-- `window_title`
-- `last_updated`
+- `active_process`: 현재 활성 프로세스 이름
+- `window_title`: 현재 활성 창 제목
+- `last_updated`: 맥락 캡처 시각
+- `duration_seconds`: 현재 창에 머문 시간(초). 기본값은 0
+- `recent_processes`: 최근 1~2분 동안 교차 사용한 프로세스 이름, 최신순 최대 3개
 
-예시:
+예시 (모델 입력에서는 snake_case로 통일):
 
 {
   "active_process": "Code.exe",
   "window_title": "auth_controller.py - ALTONG - Visual Studio Code",
-  "last_updated": "2026-09-13T18:04:55Z"
+  "last_updated": "2026-09-13T18:04:55Z",
+  "duration_seconds": 45,
+  "recent_processes": ["Code.exe", "chrome.exe", "WindowsTerminal.exe"]
 }
+
+이전 샘플처럼 새 필드가 없거나 `recent_processes`가 `null`이면 모델
+입력에서는 각각 0과 빈 목록으로 정규화한다. 클라이언트의 `Empty`는
+프로세스·창 제목이 빈 문자열이고 경과 시간은 0이다. 이때
+`last_updated`만으로 현재 작업을 추측하지 않는다.
+
+최근 프로세스는 작업 세트의 단서일 뿐 작업 제목이나 중요도 자체를
+알려주지 않는다. `urgency_score`는 알림 자체로 판단하고,
+`relevance_score`를 정할 때 현재 창 정보와 함께 제한적으로 참고한다.
 
 모델은 위 정보만을 이용하여 판단한다.
 
