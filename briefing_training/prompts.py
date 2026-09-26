@@ -14,17 +14,19 @@ SYSTEM_PROMPT = """당신은 PC 집중 세션이 끝난 뒤 차단된 알림을 
 
 반드시 다음 규칙을 지키세요.
 1. 입력 알림에 명시된 사실만 사용하고 추측하거나 새로운 사실을 만들지 마세요.
-2. 동일한 사건의 반복 알림은 하나의 흐름으로 합치세요.
-3. 변경, 취소, 복구처럼 상태가 달라졌다면 가장 최신 알림의 상태를 우선하세요.
+2. notifications_oldest_to_newest 배열은 오래된 알림부터 정렬되어 있으며 마지막 항목이 가장 최신입니다.
+3. 동일한 사건의 반복 알림은 하나의 흐름으로 합치세요.
+4. 변경, 취소, 복구, 완료처럼 상태가 달라졌다면 마지막 알림의 상태를 우선하세요.
    이미 취소되거나 바뀐 이전 일정과 상태는 최종 요약에서 제외하세요.
-4. 긴급도와 연관도가 높은 내용을 먼저 쓰세요.
-5. 제목만 나열하지 말고 본문에 있는 핵심 사실을 포함하세요.
-6. 일정과 제출 알림은 날짜, 시간, 제출물 등 사용자가 행동하는 데 필요한 정보를 보존하세요.
-7. 각 줄은 알림 표시나 필드 이름 없이 그 자체로 이해되는 완전한 문장이어야 합니다.
-8. 한국어로 짧게 작성하고 사용자 메시지에 지정된 최대 요약 줄 수를 지키세요.
-9. 마크다운, 설명, 사고 과정 없이 아래 JSON 객체 하나만 출력하세요.
-10. 최상위 값은 배열이 아니라 반드시 summary_lines 필드가 있는 객체여야 합니다.
-11. 상태가 이어지는 알림은 제목과 상태를 따로 나열하지 말고 최신 상태가 담긴 완전한 문장으로 합치세요.
+5. 뒤 알림이 앞 알림을 취소하거나 변경한 것이 아니라 새로운 정보를 보탠 경우에는 두 알림의 핵심 사실을 모두 보존하세요.
+6. 긴급도와 연관도가 높은 내용을 먼저 쓰세요.
+7. 제목만 나열하지 말고 본문에 있는 핵심 사실을 포함하세요.
+8. 일정과 제출 알림은 날짜, 시간, 제출물 등 사용자가 행동하는 데 필요한 정보를 보존하세요.
+9. 각 줄은 알림 표시나 필드 이름 없이 그 자체로 이해되는 완전한 문장이어야 합니다.
+10. 한국어로 짧게 작성하고 사용자 메시지에 지정된 최대 요약 줄 수를 지키세요.
+11. 마크다운, 설명, 사고 과정 없이 아래 JSON 객체 하나만 출력하세요.
+12. 최상위 값은 배열이 아니라 반드시 summary_lines 필드가 있는 객체여야 합니다.
+13. 상태가 이어지는 알림은 제목과 상태를 따로 나열하지 말고 최신 상태가 담긴 완전한 문장으로 합치세요.
 
 출력 스키마:
 {"summary_lines":["첫 번째 요약", "두 번째 요약"]}
@@ -35,29 +37,6 @@ SYSTEM_PROMPT = """당신은 PC 집중 세션이 끝난 뒤 차단된 알림을 
 올바른 출력:
 {"summary_lines":["첫 번째 요약", "두 번째 요약"]}
 """
-
-EXAMPLE_GROUP = {
-    "app_name": "Calendar",
-    "sender": "가상 프로젝트 리더",
-    "category": "일정/회의",
-    "urgency_score": "min=2, max=3, average=2.5",
-    "relevance_score": "min=4, max=5, average=4.5",
-    "notifications_oldest_to_newest": [
-        {
-            "timestamp": "2026-09-25T13:00:00Z",
-            "title": "주간 회의 시간 변경",
-            "body": "오늘 주간 회의를 오후 4시로 변경합니다.",
-        },
-        {
-            "timestamp": "2026-09-25T15:00:00Z",
-            "title": "주간 회의 취소",
-            "body": "오늘 오후 4시 주간 회의는 취소되었습니다.",
-        },
-    ],
-}
-
-EXAMPLE_RESPONSE = '{"summary_lines":["오늘 오후 4시 주간 회의가 취소되었습니다."]}'
-
 
 class SummaryResponseError(ValueError):
     """Raised when a model response violates the summary JSON contract."""
@@ -101,7 +80,9 @@ def _build_user_prompt(
             json.dumps(group_context, ensure_ascii=False, separators=(",", ":")),
             "",
             "제목만 복사하지 말고 body의 구체적인 핵심 사실을 포함하세요.",
-            "최신 알림이 취소, 변경, 복구를 알리면 이전 상태를 버리고 최종 상태만 쓰세요.",
+            "notifications_oldest_to_newest의 마지막 항목이 가장 최신 알림입니다.",
+            "최신 알림이 취소, 변경, 복구, 완료를 알리면 이전 상태를 버리고 최종 상태만 쓰세요.",
+            "알림끼리 상충하지 않고 서로 다른 정보를 보태면 날짜, 시간, 위치, 제출물, 필요한 행동을 빠뜨리지 마세요.",
             "같은 사건의 제목과 상태를 별도 줄로 나열하지 말고 완전한 문장으로 합치세요.",
             "입력의 id, 필드 이름, '알림 1' 같은 표시는 출력하지 마세요.",
             f"summary_lines 배열에는 최대 {max_summary_lines}개의 문장만 넣으세요.",
@@ -148,8 +129,6 @@ def build_messages(
     user_prompt = _build_user_prompt(group_context, max_summary_lines)
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": _build_user_prompt(EXAMPLE_GROUP, 1)},
-        {"role": "assistant", "content": EXAMPLE_RESPONSE},
         {"role": "user", "content": user_prompt},
     ]
 

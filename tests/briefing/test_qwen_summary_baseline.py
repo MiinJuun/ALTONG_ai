@@ -36,7 +36,7 @@ class QwenSummaryBaselineTests(unittest.TestCase):
 
         self.assertEqual(
             [message["role"] for message in messages],
-            ["system", "user", "assistant", "user"],
+            ["system", "user"],
         )
         self.assertIn('"summary_lines"', messages[0]["content"])
         self.assertIn("최상위 값은 배열이 아니라", messages[0]["content"])
@@ -49,7 +49,8 @@ class QwenSummaryBaselineTests(unittest.TestCase):
         self.assertIn("최대 1개의 문장", actual_prompt)
         self.assertIn("제목만 복사하지 말고", actual_prompt)
         self.assertIn("반드시 { 문자로 시작", actual_prompt)
-        self.assertIn("오후 4시 주간 회의가 취소", messages[2]["content"])
+        self.assertIn("마지막 항목이 가장 최신", actual_prompt)
+        self.assertIn("서로 다른 정보를 보태면", actual_prompt)
 
     def test_parser_accepts_one_to_three_summary_lines(self) -> None:
         parsed = parse_summary_response(
