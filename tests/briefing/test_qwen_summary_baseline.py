@@ -1,5 +1,10 @@
 import unittest
 
+from briefing_training.evaluate import (
+    _expected_facts,
+    _forbidden_phrases,
+    _max_summary_lines,
+)
 from briefing_training.prompts import (
     SummaryResponseError,
     build_messages,
@@ -79,6 +84,20 @@ class QwenSummaryBaselineTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "must not be empty"):
             build_messages(group)
+
+    def test_evaluation_case_supports_fact_alternatives_and_latest_state(self) -> None:
+        case = {
+            "expected_facts": [["복구", "정상화"], ["로그인"]],
+            "forbidden_phrases": ["장애 진행 중"],
+            "max_summary_lines": 1,
+        }
+
+        self.assertEqual(
+            _expected_facts(case),
+            (("복구", "정상화"), ("로그인",)),
+        )
+        self.assertEqual(_forbidden_phrases(case), ("장애 진행 중",))
+        self.assertEqual(_max_summary_lines(case), 1)
 
 
 if __name__ == "__main__":

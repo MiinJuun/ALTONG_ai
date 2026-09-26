@@ -36,9 +36,10 @@ python -m briefing_training.evaluate
 ```
 
 The evaluator reports structured JSON compliance, expected-fact coverage,
-and average generation latency. Fact alternatives allow equivalent source
-expressions such as recovery and normalization. These metrics are a small baseline check, not
-a final model-quality benchmark.
+superseded-state violations, per-case pass rate, and average generation latency.
+Fact alternatives allow equivalent source expressions such as recovery and
+normalization. These metrics are a small baseline check, not a final
+model-quality benchmark.
 
 Generated checkpoints, adapters, and experiment outputs must remain under an
 ignored `outputs` directory. Never add real notifications or personal data.
